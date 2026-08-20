@@ -1,5 +1,3 @@
-from sentence_transformers import CrossEncoder
-import torch
 import logging
 
 logger = logging.getLogger(__name__)
@@ -10,6 +8,8 @@ class RerankingEngine:
     _instance = None
 
     def __init__(self, model_name: str = "BAAI/bge-reranker-base"):
+        import torch
+        from sentence_transformers import CrossEncoder
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         logger.info(f"Loading reranking model {model_name} on {self.device}")
         

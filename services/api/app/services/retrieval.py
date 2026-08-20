@@ -3,10 +3,16 @@ from app.services.qdrant import QdrantService, qdrant_service
 
 
 class RetrievalEngine:
-    def __init__(self, embedding_engine: EmbeddingEngine, qdrant: QdrantService, collection_name: str = "documents"):
-        self.embedding = embedding_engine
+    def __init__(self, qdrant: QdrantService, collection_name: str = "documents"):
         self.qdrant = qdrant
         self.collection_name = collection_name
+        self._embedding = None
+
+    @property
+    def embedding(self):
+        if self._embedding is None:
+            self._embedding = EmbeddingEngine.get_instance()
+        return self._embedding
 
     async def retrieve(self, query: str, knowledge_base_id: str | None = None, top_k: int = 5) -> list[dict]:
         """
@@ -38,4 +44,4 @@ class RetrievalEngine:
             
         return formatted_results
 
-retrieval_engine = RetrievalEngine(EmbeddingEngine.get_instance(), qdrant_service)
+retrieval_engine = RetrievalEngine(qdrant_service)

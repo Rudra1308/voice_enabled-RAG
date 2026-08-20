@@ -1,8 +1,5 @@
 import logging
 
-import torch
-from sentence_transformers import SentenceTransformer
-
 logger = logging.getLogger(__name__)
 
 class EmbeddingEngine:
@@ -11,13 +8,15 @@ class EmbeddingEngine:
     _instance = None
 
     def __init__(self, model_name: str = "BAAI/bge-small-en-v1.5"):
+        import torch
+        from sentence_transformers import SentenceTransformer
         # Detect device to optimize for GPU if available, respecting the user's RTX3050.
         # bge-small is very lightweight (~130MB) so it easily fits in 6GB VRAM.
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         logger.info(f"Loading embedding model {model_name} on {self.device}")
         
         self.model = SentenceTransformer(model_name, device=self.device)
-        self.vector_dim = self.model.get_sentence_embedding_dimension()
+        self.vector_dim = self.model.get_embedding_dimension()
 
     @classmethod
     def get_instance(cls):
