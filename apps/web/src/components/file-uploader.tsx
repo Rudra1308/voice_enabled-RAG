@@ -8,26 +8,7 @@ export function FileUploader() {
   const [files, setFiles] = useState<{ id?: string, file: File | { name: string }, status: string; progress: number }[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
-    const fetchDocuments = async () => {
-      try {
-        const res = await fetch("/api/documents/");
-        if (res.ok) {
-          const data = await res.json();
-          const existingFiles = data.documents.map((doc: any) => ({
-            id: doc.id,
-            file: { name: doc.filename },
-            status: doc.status.toLowerCase() === 'ready' || doc.status.toLowerCase() === 'pending' ? 'success' : 'error',
-            progress: 100
-          }));
-          setFiles(existingFiles);
-        }
-      } catch (err) {
-        console.error("Failed to fetch documents", err);
-      }
-    };
-    fetchDocuments();
-  }, []);
+
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
@@ -78,7 +59,8 @@ export function FileUploader() {
     }, 200)
 
     try {
-      const res = await fetch("/api/documents/upload", {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+      const res = await fetch(`${apiUrl}/api/documents/upload`, {
         method: "POST",
         body: formData,
       })

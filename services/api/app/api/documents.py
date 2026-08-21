@@ -27,17 +27,6 @@ async def upload_document(
     # Read content to hash it for deduplication
     content = await file.read()
     file_hash = hashlib.sha256(content).hexdigest()
-    
-    # Optional: check if document with this hash already exists in this KB
-    # (Skipping for now to keep it simple, but we have the hash)
-
-    # Save file locally using hash to avoid collisions
-    ext = os.path.splitext(file.filename)[1]
-    safe_filename = f"{file_hash}{ext}"
-    file_path = os.path.join(UPLOAD_DIR, safe_filename)
-
-    with open(file_path, "wb") as f:
-        f.write(content)
 
     # Make sure we have a user and KB (Mocking for Phase 3 so it works standalone)
     kb = await kb_repo.get(db, knowledge_base_id)
@@ -49,6 +38,28 @@ async def upload_document(
             "user_id": user.id,
             "name": "Default Knowledge Base"
         })
+
+    # Check if document with this hash already exists in this KB
+    from sqlalchemy.future import select
+    from app.models import Document
+    
+    existing_doc_query = await db.execute(
+        select(Document).filter(
+            Document.knowledge_base_id == kb.id,
+            Document.content_hash == file_hash
+        )
+    )
+    existing_doc = existing_doc_query.scalars().first()
+    if existing_doc:
+        return {"message": "File already exists", "document_id": existing_doc.id, "status": existing_doc.status}
+
+    # Save file locally using hash to avoid collisions
+    ext = os.path.splitext(file.filename)[1]
+    safe_filename = f"{file_hash}{ext}"
+    file_path = os.path.join(UPLOAD_DIR, safe_filename)
+
+    with open(file_path, "wb") as f:
+        f.write(content)
 
     from app.services.ingestion import process_document_background
 
@@ -80,7 +91,7 @@ async def upload_document(
 
     return {"message": "File uploaded successfully", "document_id": doc.id, "status": doc.status}
 
-@router.get("/")
+@router.get("")
 async def list_documents(
     knowledge_base_id: str = "default-kb-id",
     db: AsyncSession = Depends(get_db)

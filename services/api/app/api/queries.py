@@ -35,39 +35,45 @@ async def stream_query(request: QueryRequest, db: AsyncSession = Depends(get_db)
         print(f"Retrieval error: {e}")
         chunks = []
     
-    # 3. Grounding + Citations (Phase 13)
-    # We will fetch document names from DB for the chunks
-    # (Moved inside generate to allow early streaming)
+    # 3. Grounding + Citations
+    # Fetch document names from DB before streaming so we don't use a closed DB session
+    doc_names = {}
+    if chunks:
+        for chunk in chunks:
+            doc_id = chunk.get("document_id")
+            if doc_id and doc_id not in doc_names:
+                try:
+                    doc = await document_repo.get(db, doc_id)
+                    if doc:
+                        doc_names[doc_id] = doc.filename
+                except Exception as e:
+                    print(f"Error fetching doc {doc_id}: {e}")
 
     # 4. Stream response
     async def generate():
         yield json.dumps({"type": "token", "data": "*(Initializing AI models, this may take a few minutes on the first run...)*\n\n"}) + "\n"
         
-        # 2. Rerank (Moved here so we can stream the message above FIRST)
+        # 2. Rerank
         reranked_chunks = []
         if chunks:
             from app.core.config import settings
+            import asyncio
             if settings.GROQ_API_KEY:
-                # Disable heavy local reranker when running in cloud to fit 512MB free tier RAM
                 reranked_chunks = chunks[:3]
             else:
-                reranker = RerankingEngine.get_instance()
-                reranked_chunks = reranker.rerank(request.query, chunks, top_k=3)
+                try:
+                    reranker = RerankingEngine.get_instance()
+                    reranked_chunks = await asyncio.to_thread(reranker.rerank, request.query, chunks, top_k=3)
+                except Exception as e:
+                    print(f"Reranker failed (fallback to original chunks): {e}")
+                    reranked_chunks = chunks[:3]
             
         formatted_context = []
         citations = []
         
         for i, chunk in enumerate(reranked_chunks):
             doc_id = chunk.get("document_id")
-            doc_name = "Unknown Document"
-            if doc_id:
-                try:
-                    # Need to lookup document name from db
-                    doc = await document_repo.get(db, doc_id)
-                    if doc:
-                        doc_name = doc.filename
-                except Exception:
-                    pass
+            doc_name = doc_names.get(doc_id, "Unknown Document") if doc_id else "Unknown Document"
                     
             citation_num = i + 1
             citations.append({

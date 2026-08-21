@@ -9,7 +9,6 @@ const navItems = [
   { name: 'Home', href: '/', icon: FolderSync },
   { name: 'Knowledge Base', href: '/knowledge', icon: Upload },
   { name: 'Research Assistant', href: '/research', icon: MessagesSquare },
-  { name: 'Evaluations', href: '/evaluations', icon: Activity },
 ];
 
 export function Sidebar() {

@@ -57,7 +57,8 @@ export function VoiceInput({ onTranscribe, isProcessing = false }: VoiceInputPro
 
     try {
       // Send to FastAPI
-      const res = await fetch('/api/voice/transcribe', {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+      const res = await fetch(`${apiUrl}/api/voice/transcribe`, {
         method: 'POST',
         body: formData,
       });

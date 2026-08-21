@@ -4,14 +4,14 @@ import React, { useState, useRef, useEffect } from 'react';
 import { VoiceInput } from '@/components/voice-input';
 import { ttsEngine } from '@/lib/tts';
 import { Send, Volume2, VolumeX, FileText } from 'lucide-react';
+import { useChat } from '@/components/chat-context';
 
 export default function ResearchPage() {
   const [query, setQuery] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   
   // Chat state
-  const [messages, setMessages] = useState<{role: 'user'|'assistant', content: string, citations?: any[]}[]>([]);
-  const [soundEnabled, setSoundEnabled] = useState(true);
+  const { messages, setMessages, soundEnabled, setSoundEnabled } = useChat();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -47,38 +47,47 @@ export default function ResearchPage() {
         })
       });
 
+      if (!res.ok) {
+        throw new Error(`API Error: ${res.status} ${res.statusText}`);
+      }
+
       if (res.body) {
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let done = false;
+        let buffer = '';
 
         while (!done) {
           const { value, done: doneReading } = await reader.read();
           done = doneReading;
           if (value) {
-            const chunkValue = decoder.decode(value);
+            buffer += decoder.decode(value, { stream: !done });
             // Responses are NDJSON
-            const lines = chunkValue.split('\n').filter(l => l.trim() !== '');
+            const lines = buffer.split('\n');
+            // Keep the last incomplete line in the buffer
+            buffer = lines.pop() || '';
+            
             for (const line of lines) {
+              if (!line.trim()) continue;
               try {
                 const data = JSON.parse(line);
                 if (data.type === 'citations') {
                   citationsData = data.data;
                   setMessages(prev => {
                     const newArr = [...prev];
-                    newArr[newArr.length - 1].citations = citationsData;
+                    newArr[newArr.length - 1] = { ...newArr[newArr.length - 1], citations: citationsData };
                     return newArr;
                   });
                 } else if (data.type === 'token') {
                   assistantText += data.data;
                   setMessages(prev => {
                     const newArr = [...prev];
-                    newArr[newArr.length - 1].content = assistantText;
+                    newArr[newArr.length - 1] = { ...newArr[newArr.length - 1], content: assistantText };
                     return newArr;
                   });
                 }
               } catch(e) {
-                // partial line
+                console.error("Failed to parse JSON stream line:", line, e);
               }
             }
           }
@@ -89,8 +98,17 @@ export default function ResearchPage() {
           ttsEngine.speak(assistantText);
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setMessages(prev => {
+        const newArr = [...prev];
+        const currentContent = newArr[newArr.length - 1].content;
+        newArr[newArr.length - 1] = { 
+          ...newArr[newArr.length - 1], 
+          content: currentContent + `\n\n*(Error: ${err.message || 'Connection failed'})*`
+        };
+        return newArr;
+      });
     } finally {
       setIsProcessing(false);
     }

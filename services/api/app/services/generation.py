@@ -21,10 +21,13 @@ class GenerationEngine:
         """Constructs a prompt string with context and history, grouped by document."""
         
         # Group by document
-        context_text = "\n\n".join([
-            f"{chunk['content']}" 
-            for chunk in context_chunks
-        ])
+        if not context_chunks:
+            context_text = "NO CONTEXT WAS FOUND FOR THIS QUERY. You MUST state that no relevant documents were found in the uploaded content, and refuse to answer the question based on your own knowledge."
+        else:
+            context_text = "\n\n".join([
+                f"{chunk['content']}" 
+                for chunk in context_chunks
+            ])
         
         history_text = ""
         if history:
@@ -36,7 +39,7 @@ class GenerationEngine:
         
         prompt = f"""You are a helpful and precise academic research assistant.
 Use the following pieces of context to answer the user's question. 
-If you don't know the answer based on the context, just say that you don't know, don't try to make up an answer.
+If the context is empty, or if you don't know the answer based on the context, you MUST say that you don't know or that no relevant documents were found. Do NOT try to make up an answer or answer from your general knowledge.
 Keep the answer concise and academic in tone.
 Always cite your sources if possible based on the context provided.
 
